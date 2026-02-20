@@ -55,6 +55,7 @@ var MAX = {
         }
     }
 };
+
 try {
     var params = JSON.parse(value);
 
@@ -62,6 +63,7 @@ try {
         throw 'Incorrect value is given for parameter "Token": parameter is missing';
     }
     MAX.token = params.Token;
+
     // Либо UserId, либо ChatId (что-то одно обязательно)
     if (typeof params.UserId !== 'undefined' && params.UserId !== '') {
         MAX.user_id = params.UserId;
@@ -72,7 +74,29 @@ try {
     if (!MAX.user_id && !MAX.chat_id) {
         throw 'Neither "UserId" nor "ChatId" parameter is specified';
     }
-    MAX.text = params.Subject + '\n' + params.Message;
+
+    // ── Определение иконки по severity / resolved ──
+    var icon;
+    if (params.Subject.indexOf("Resolved") >= 0) {
+        icon = '✅';
+    } else if (params.Message.indexOf("Disaster") >= 0) {
+        icon = '🔥';
+    } else if (params.Message.indexOf("High") >= 0) {
+        icon = '❌';
+    } else if (params.Message.indexOf("Average") >= 0) {
+        icon = '❗️';
+    } else if (params.Message.indexOf("Warning") >= 0) {
+        icon = '⚠️';
+    } else if (params.Message.indexOf("Information") >= 0) {
+        icon = 'ℹ️';
+    } else {
+        icon = '❔';
+    }
+
+    // ── Текст сообщения с иконкой ──
+    MAX.text = icon + ' ' + params.Subject + '\n' + params.Message;
+
+    // ── Format (markdown / html) ──
     if (typeof params.Format !== 'undefined' && params.Format !== '') {
         var allowedFormats = ['markdown', 'html'];
         if (allowedFormats.indexOf(params.Format) === -1) {
@@ -80,12 +104,15 @@ try {
         }
         MAX.format = params.Format;
     }
+
     if (typeof params.DisableLinkPreview !== 'undefined' && params.DisableLinkPreview !== '') {
         MAX.disable_link_preview = (params.DisableLinkPreview === 'true' || params.DisableLinkPreview === '1');
     }
+
     if (typeof params.Notify !== 'undefined' && params.Notify !== '') {
         MAX.notify = (params.Notify === 'true' || params.Notify === '1');
     }
+
     MAX.sendMessage();
     return 'OK';
 }
