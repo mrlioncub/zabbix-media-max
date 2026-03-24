@@ -1,18 +1,21 @@
 zabbix_export:
   version: '7.0'
   media_types:
-    - name: 'MAX html'
+    - name: 'MAX'
       type: WEBHOOK
       parameters:
         - name: ChatId
+          value: ''
+        - name: UserId
           value: '{ALERT.SENDTO}'
         - name: Message
           value: '{ALERT.MESSAGE}'
-        - name: ParseMode
-          value: html
+        - name: Format
+          value: 'html'
         - name: Subject
           value: '{ALERT.SUBJECT}'
         - name: Token
+          value: '{TOKEN.SUBJECT}'
       script: |
         var MAX = {
             token: null,
@@ -58,7 +61,14 @@ zabbix_export:
                 Zabbix.Log(4, '[ MAX webhook ] HTTP code: ' + request.getStatus());
                 Zabbix.Log(4, '[ MAX webhook ] Raw response: ' + response);
                 if (request.getStatus() !== 200) {
-                    throw 'HTTP status code ' + request.getStatus();
+                    var errBody = '';
+                    try {
+                        var errParsed = JSON.parse(response);
+                        errBody = errParsed.message || errParsed.error || JSON.stringify(errParsed);
+                    } catch (e) {
+                        errBody = response;
+                    }
+                    throw 'HTTP ' + request.getStatus() + ': ' + errBody;
                 }
                 try {
                     response = JSON.parse(response);
@@ -78,15 +88,17 @@ zabbix_export:
                 throw 'Incorrect value is given for parameter "Token": parameter is missing';
             }
             MAX.token = params.Token;
-            // Либо UserId, либо ChatId (что-то одно обязательно)
+            if (typeof params.UserId !== 'undefined' && params.UserId !== '' && typeof params.ChatId !== 'undefined' && params.ChatId !== '') {
+                throw 'Both "UserId" and "ChatId" are specified: use only one';
+            }
+            if ((typeof params.UserId === 'undefined' || params.UserId === '') && (typeof params.ChatId === 'undefined' || params.ChatId === '')) {
+                throw 'Neither "UserId" nor "ChatId" parameter is specified';
+            }
             if (typeof params.UserId !== 'undefined' && params.UserId !== '') {
                 MAX.user_id = params.UserId;
             }
             if (typeof params.ChatId !== 'undefined' && params.ChatId !== '') {
                 MAX.chat_id = params.ChatId;
-            }
-            if (!MAX.user_id && !MAX.chat_id) {
-                throw 'Neither "UserId" nor "ChatId" parameter is specified';
             }
             MAX.text = params.Subject + '\n' + params.Message;
             if (typeof params.Format !== 'undefined' && params.Format !== '') {
@@ -109,34 +121,53 @@ zabbix_export:
             Zabbix.Log(4, '[ MAX webhook ] notification failed: ' + error);
             throw 'Sending failed: ' + error + '.';
         }
+      timeout: 10s
+      description: |
+        Github: https://github.com/noakky/zabbix-media-max
+
+        Токен бота MAX:
+        Чат-бот и мини-приложение → Интеграция → Получить токен
+
+        Параметры при настройке оповещения:
+        - Token: токен бота
+        - UserId: ID пользователя (заполнить ChatId либо UserId — не оба!)
+        - ChatId: ID группового чата
       message_templates:
         - event_source: TRIGGERS
           operation_mode: PROBLEM
-          subject: 'Problem: {EVENT.NAME}'
+          subject: '{EVENT.SEVERITY}: {EVENT.NAME}'
           message: |
-            Problem started at {EVENT.TIME} on {EVENT.DATE}
-            Problem name: {EVENT.NAME}
-            Host: {HOST.NAME}
-            Severity: {EVENT.SEVERITY}
-            Operational data: {EVENT.OPDATA}
-            Original problem ID: {EVENT.ID}
-            {TRIGGER.URL}
+            Started at {EVENT.TIME} on {EVENT.DATE} ({EVENT.OPDATA})
+            {HOST.NAME}
         - event_source: TRIGGERS
           operation_mode: RECOVERY
-          subject: 'Resolved in {EVENT.DURATION}: {EVENT.NAME}'
-          message: |
-            Problem has been resolved at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}
-            Problem name: {EVENT.NAME}
-            Problem duration: {EVENT.DURATION}
-            Host: {HOST.NAME}
-            Severity: {EVENT.SEVERITY}
-            Original problem ID: {EVENT.ID}
-            {TRIGGER.URL}
+          subject: '✅ {EVENT.DURATION}: {EVENT.RECOVERY.NAME}'
+          message: '{HOST.NAME} in {EVENT.DURATION} at {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE} ({EVENT.OPDATA})'
         - event_source: TRIGGERS
           operation_mode: UPDATE
-          subject: 'Updated problem in {EVENT.AGE}: {EVENT.NAME}'
+          subject: '✏️ {EVENT.NAME}'
           message: |
-            {USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.
+            {USER.FULLNAME} {HOST.NAME} {EVENT.UPDATE.ACTION} {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.
             {EVENT.UPDATE.MESSAGE}
+        - event_source: DISCOVERY
+          operation_mode: PROBLEM
+          subject: 'Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}'
+          message: |
+            Discovery rule: {DISCOVERY.RULE.NAME}
             
-            Current problem status is {EVENT.STATUS}, age is {EVENT.AGE}, acknowledged: {EVENT.ACK.STATUS}.
+            Device IP: {DISCOVERY.DEVICE.IPADDRESS}
+            Device DNS: {DISCOVERY.DEVICE.DNS}
+            Device status: {DISCOVERY.DEVICE.STATUS}
+            Device uptime: {DISCOVERY.DEVICE.UPTIME}
+            
+            Device service name: {DISCOVERY.SERVICE.NAME}
+            Device service port: {DISCOVERY.SERVICE.PORT}
+            Device service status: {DISCOVERY.SERVICE.STATUS}
+            Device service uptime: {DISCOVERY.SERVICE.UPTIME}
+        - event_source: AUTOREGISTRATION
+          operation_mode: PROBLEM
+          subject: 'Autoregistration: {HOST.HOST}'
+          message: |
+            Host name: {HOST.HOST}
+            Host IP: {HOST.IP}
+            Agent port: {HOST.PORT}

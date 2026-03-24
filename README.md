@@ -1,130 +1,68 @@
-# Zabbix → MAX Webhook
+# Zabbix Media Type — MAX
 
-Интеграция Zabbix с платформой MAX через Webhook‑media type.  
-Скрипт отправляет уведомления о проблемах и их восстановлении в MAX‑чат или конкретному пользователю, с наглядными иконками:
+Send Zabbix notifications to [MAX](https://max.ru) messenger via Webhook.
 
-- при проблеме — `❌` (красный крест) и текст триггера;
-- при восстановлении — `✅` (зелёная галочка) и текст триггера.
+> REDME [Russian](https://github.com/noakky/zabbix-media-max/blob/main/README.ru.md)
+---
+
+## Requirements
+
+- Zabbix 7.0+
+- A bot on the MAX platform
 
 ---
 
-## Возможности
+## Getting the Bot Token
 
-- Отправка сообщений из Zabbix в:
-  - личный диалог с пользователем (`user_id`);
-  - групповой чат (`chat_id`).
-- Поддержка форматирования текста (`html` или `markdown`).
-- Настройка:
-  - отключения превью ссылок;
-  - уведомлений / тихих сообщений (`notify`).
+1. Open [business.max.ru](https://business.max.ru/self)
+2. Navigate to: **Chat-bots → Integration → Get token**
+3. Enable **"Allow adding to group chats"** if you need to send to group chats
 
 ---
 
-## Требования
+## Installation
 
-- Zabbix 5.0+ (или любая версия с media type типа **Webhook** и `HttpRequest` в JavaScript).
-- Аккаунт и бот на платформе MAX.
-- Токен бота MAX:
-  - в интерфейсе MAX: `Чат-бот и мини-приложение → Настройка → Токен доступа`. (Не забудьте включить "Добавление в групповые чаты")
----
+### 1. Import the media type
 
-## Установка
+`Administration → Media types → Import` — upload the `zbx_export_mediatypes.yaml` file
 
-### 1. Создать media type в Zabbix
+### 2. Configure the media type
 
-1. Откройте: `Administration → Media types → Create media type`.
-2. Заполните:
-   - **Name**: `MAX`
-   - **Type**: `Webhook`
-   - **Status**: `Enabled`
+Open the imported **MAX** media type and fill in the parameters:
 
-3. Во вкладке **Script** вставьте код из файла Script
-### 2. Параметры media type
+| Parameter | Value | Required |
+|-----------|-------|:---:|
+| `Token` | MAX bot token | ✅ |
+| `UserId` | MAX user ID | ⚠️ |
+| `ChatId` | MAX group chat ID | ⚠️ |
+| `Format` | `html` or `markdown` | — |
 
-Во вкладке **Parameters** добавьте параметры (Name → Value):
+> ⚠️ Specify **only one** of: `UserId` **or** `ChatId`. Providing both will result in an error.
 
-Обязательные:
+### 3. Configure user media
 
-- `Token`  
-  Значение: токен бота MAX  
-  Пример: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+`Administration → Users → <user> → Media → Add`
 
-Один из двух (выберите схему, которую будете использовать):
+- **Type**: `MAX`
+- **Send to**: user ID or chat ID
 
-- Вариант 1: отправка **конкретному пользователю**:
-  - `UserId` → `{ALERT.SENDTO}`  
-    В поле "Send to" у пользователя будет `user_id` из MAX.
+#### How to get a chat ID
 
-- Вариант 2: отправка **в чат**:
-  - `ChatId` → `{ALERT.SENDTO}`  
-    В поле "Send to" у пользователя будет `chat_id` из MAX.
+Add the bot to the chat, then run:
 
-Текст:
+```bash
+curl -X GET "https://platform-api.max.ru/chats" \
+  -H "Authorization: <token>"
+```
 
-- `Subject` → `{ALERT.SUBJECT}`
-- `Message` → `{ALERT.MESSAGE}`
-
-Опциональные:
-
-- `Format` → `html`  
-  или `markdown` (если хотите использовать форматирование MAX)
-
-- `DisableLinkPreview` → `1` или `0`  
-  `1` — отключить превью ссылок, `0` — включить
-
-- `Notify` → `1` или `0`  
-  `1` — присылать уведомления участникам чата, `0` — тихие сообщения
+Find the target chat in the response and copy the `chat_id` value.
 
 ---
 
-### 3. Настройка пользователя (Media)
+## Message Formatting
 
-1. Откройте: `Administration → Users`.
-2. Выберите пользователя, перейдите на вкладку **Media**.
-3. Добавьте запись:
-   - **Type**: `MAX`
-   - **Send to**: 1234567890
-- для ChatId‑варианта: укажите `chat_id` чата MAX, например: -4567456745674576
-Важно: без двоеточий, пробелов и прочих символов, только число.
-   - Остальные поля по вашему стандарту (severity, period и т.д.)
-4. Для запроса id чата надо, добавить бота в чат и выполнить запрос : curl -k -X GET "https://platform-api.max.ru/chats"  -H "Authorization: {token}", вернется что то вроде:
-   - {"chats":[{"chat_id":-4567456745674576,"type":"chat","status":"active","title":"Тестовый чат","last_event_time":1763965283164,"participants_count":3,"is_public":false,"messages_count":3}]}
-   
-## Шаблоны сообщений Zabbix
+The `Format` parameter supports two modes:
 
-# Problem  
-• Message type: Problem  
-Subject:  
-❌ Problem: {EVENT.NAME}  
-Message:  
-❌ Проблема началась в {EVENT.TIME} {EVENT.DATE}  
-Проблема: {EVENT.NAME}  
-Хост: {HOST.NAME}  
-Важность: {EVENT.SEVERITY}  
-Данные: {EVENT.OPDATA}  
-ID проблемы: {EVENT.ID}  
-{TRIGGER.URL}  
+**HTML**: `<b>bold</b>`, `<i>italic</i>`, `<code>code</code>`, `<a href="...">link</a>`
 
-# Problem recovery  
-• Message type: Problem recovery  
-Subject:  
-✅ Resolved: {EVENT.RECOVERY.NAME}  
-Message:  
-✅ Проблема решена в {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}  
-Проблема: {EVENT.RECOVERY.NAME}  
-Длительность: {EVENT.DURATION}  
-Хост: {HOST.NAME}  
-Важность: {EVENT.SEVERITY}  
-ID проблемы: {EVENT.ID}  
-{TRIGGER.URL}  
-
-# Problem update (по желанию)  
-Subject:  
-ℹ️ Updated: {EVENT.NAME}  
-Message:  
-{USER.FULLNAME} {EVENT.UPDATE.ACTION} проблему в {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.  
-{EVENT.UPDATE.MESSAGE}  
-Текущий статус: {EVENT.STATUS}, возраст: {EVENT.AGE}, подтверждена: {EVENT.ACK.STATUS}.  
-
-
-<img width="722" height="775" alt="image" src="https://github.com/user-attachments/assets/75ade0e2-9a49-4089-a864-616e6f8cecdf" />
+**Markdown**: `**bold**`, `*italic*`, `` `code` ``, `[link](url)`
