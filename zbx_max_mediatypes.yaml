@@ -129,7 +129,7 @@ zabbix_export:
           subject: '{EVENT.SEVERITY}: {EVENT.NAME}'
           message: |
             Started at {EVENT.TIME} on {EVENT.DATE} ({EVENT.OPDATA})
-            {HOST.NAME}disable_link_preview
+            {HOST.NAME}
         - event_source: TRIGGERS
           operation_mode: RECOVERY
           subject: '✅ {EVENT.DURATION}: {EVENT.RECOVERY.NAME}'
