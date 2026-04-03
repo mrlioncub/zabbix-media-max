@@ -1,7 +1,7 @@
 zabbix_export:
   version: '7.0'
   media_types:
-    - name: 'MAX test'
+    - name: 'MAX'
       type: WEBHOOK
       parameters:
         - name: To
