@@ -1,12 +1,10 @@
 zabbix_export:
   version: '7.0'
   media_types:
-    - name: 'MAX'
+    - name: 'MAX test'
       type: WEBHOOK
       parameters:
-        - name: ChatId
-          value: ''
-        - name: UserId
+        - name: To
           value: '{ALERT.SENDTO}'
         - name: Message
           value: '{ALERT.MESSAGE}'
@@ -16,11 +14,12 @@ zabbix_export:
           value: '{ALERT.SUBJECT}'
         - name: Token
           value: '{TOKEN.SUBJECT}'
+        - name: DisableLinkPreview
+          value: 'true'
       script: |
         var MAX = {
             token: null,
-            user_id: null,
-            chat_id: null,
+            to: null,
             text: null,
             format: null,
             disable_link_preview: null,
@@ -31,11 +30,16 @@ zabbix_export:
                     query = [],
                     data,
                     response;
-                if (MAX.user_id) {
-                    query.push('user_id=' + encodeURIComponent(MAX.user_id));
+                if (MAX.to) {
+                    const parts = MAX.to.split('=');
+                    if (parts.length === 2) {
+                        query.push(parts[0] + '=' + parts[1]);
+                    } else {
+                        query.push('user_id=' + MAX.to);
+                    }
                 }
-                if (MAX.chat_id) {
-                    query.push('chat_id=' + encodeURIComponent(MAX.chat_id));
+                if (MAX.disable_link_preview) {
+                    query.push('disable_link_preview=' + MAX.disable_link_preview);
                 }
                 if (query.length > 0) {
                     url += '?' + query.join('&');
@@ -47,9 +51,6 @@ zabbix_export:
                 };
                 if (MAX.format !== null) {
                     body.format = MAX.format;
-                }
-                if (MAX.disable_link_preview !== null) {
-                    body.disable_link_preview = MAX.disable_link_preview;
                 }
                 if (MAX.notify !== null) {
                     body.notify = MAX.notify;
@@ -88,17 +89,8 @@ zabbix_export:
                 throw 'Incorrect value is given for parameter "Token": parameter is missing';
             }
             MAX.token = params.Token;
-            if (typeof params.UserId !== 'undefined' && params.UserId !== '' && typeof params.ChatId !== 'undefined' && params.ChatId !== '') {
-                throw 'Both "UserId" and "ChatId" are specified: use only one';
-            }
-            if ((typeof params.UserId === 'undefined' || params.UserId === '') && (typeof params.ChatId === 'undefined' || params.ChatId === '')) {
-                throw 'Neither "UserId" nor "ChatId" parameter is specified';
-            }
-            if (typeof params.UserId !== 'undefined' && params.UserId !== '') {
-                MAX.user_id = params.UserId;
-            }
-            if (typeof params.ChatId !== 'undefined' && params.ChatId !== '') {
-                MAX.chat_id = params.ChatId;
+            if (typeof params.To !== 'undefined' && params.To !== '') {
+                MAX.to = params.To;
             }
             MAX.text = params.Subject + '\n' + params.Message;
             if (typeof params.Format !== 'undefined' && params.Format !== '') {
@@ -130,15 +122,14 @@ zabbix_export:
 
         Параметры при настройке оповещения:
         - Token: токен бота
-        - UserId: ID пользователя (заполнить ChatId либо UserId — не оба!)
-        - ChatId: ID группового чата
+        - To: ID пользователя (сам ID или начинающегося с user_id=) или ID чата (начинающегося с chat_id=)
       message_templates:
         - event_source: TRIGGERS
           operation_mode: PROBLEM
           subject: '{EVENT.SEVERITY}: {EVENT.NAME}'
           message: |
             Started at {EVENT.TIME} on {EVENT.DATE} ({EVENT.OPDATA})
-            {HOST.NAME}
+            {HOST.NAME}disable_link_preview
         - event_source: TRIGGERS
           operation_mode: RECOVERY
           subject: '✅ {EVENT.DURATION}: {EVENT.RECOVERY.NAME}'

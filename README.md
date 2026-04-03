@@ -33,18 +33,15 @@ Open the imported **MAX** media type and fill in the parameters:
 | Parameter | Value | Required |
 |-----------|-------|:---:|
 | `Token` | MAX bot token | ✅ |
-| `UserId` | MAX user ID | ⚠️ |
-| `ChatId` | MAX group chat ID | ⚠️ |
+| `To` | MAX user ID or start with user_id= or MAX chat ID start with chat_id= | ⚠️ |
 | `Format` | `html` or `markdown` | — |
-
-> ⚠️ Specify **only one** of: `UserId` **or** `ChatId`. Providing both will result in an error.
 
 ### 3. Configure user media
 
 `Administration → Users → <user> → Media → Add`
 
 - **Type**: `MAX`
-- **Send to**: user ID or chat ID
+- **Send to**: user ID or chat ID with chat_id=
 
 #### How to get a chat ID
 
